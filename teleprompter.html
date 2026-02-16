@@ -416,6 +416,82 @@
     transition: opacity 0.2s;
   }
   #backBtn:hover { opacity: 1; background: rgba(255,255,255,0.2); }
+
+  /* Pannello impostazioni sopra la barra */
+  #settingsPanel {
+    display: none;
+    position: fixed;
+    bottom: 62px;
+    left: 0;
+    right: 0;
+    background: #1e1e1e;
+    border-top: 1px solid #333;
+    padding: 14px 20px;
+    z-index: 190;
+    animation: slideUp 0.2s ease-out;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .settings-row:last-child { margin-bottom: 0; }
+
+  .settings-label {
+    color: #aaa;
+    font-size: 13px;
+    min-width: 90px;
+    flex-shrink: 0;
+  }
+
+  .settings-row input[type="range"] {
+    flex: 1;
+    max-width: 200px;
+    accent-color: #e91e63;
+    height: 6px;
+    cursor: pointer;
+  }
+
+  .settings-value {
+    color: #fff;
+    font-size: 13px;
+    min-width: 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Pulsanti allineamento */
+  .align-group {
+    display: flex;
+    gap: 4px;
+  }
+
+  .align-btn {
+    background: #333;
+    border: none;
+    color: #aaa;
+    width: 34px;
+    height: 30px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .align-btn:hover { background: #444; color: #fff; }
+  .align-btn.active { background: #e91e63; color: #fff; }
+
+  .align-btn svg { width: 16px; height: 16px; fill: currentColor; }
 </style>
 </head>
 <body>
@@ -460,6 +536,26 @@
   <!-- Parola sentita (debug piccolo) -->
   <div id="heardWord"></div>
 
+  <!-- Pannello impostazioni -->
+  <div id="settingsPanel">
+    <div class="settings-row">
+      <span class="settings-label">Margini laterali</span>
+      <input type="range" id="marginSlider" min="0" max="40" value="0" oninput="updateMargins(this.value)">
+      <span class="settings-value" id="marginValue">0%</span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-label">Allineamento</span>
+      <div class="align-group">
+        <button class="align-btn active" id="alignLeftBtn" onclick="setAlign('left')" title="Sinistra">
+          <svg viewBox="0 0 24 24"><path d="M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zM3 21h18v-2H3v2zM3 3v2h18V3H3z"/></svg>
+        </button>
+        <button class="align-btn" id="alignCenterBtn" onclick="setAlign('center')" title="Centro">
+          <svg viewBox="0 0 24 24"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Barra controlli -->
   <div id="controlBar">
     <div class="controls-left">
@@ -484,6 +580,13 @@
     </div>
 
     <div class="controls-right">
+      <div class="ctrl-with-label">
+        <button class="ctrl-btn" id="settingsBtn" onclick="toggleSettings()" title="Impostazioni">
+          <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        </button>
+        <span class="ctrl-label">Calibra</span>
+      </div>
+
       <div class="ctrl-with-label">
         <button class="ctrl-btn" id="flipBtn" onclick="toggleFlip()" title="Flip">
           <svg viewBox="0 0 24 24"><path d="M15 21h2v-2h-2v2zm4-12h2V7h-2v2zM3 5v14c0 1.1.9 2 2 2h4v-2H5V5h4V3H5c-1.1 0-2 .9-2 2zm16-2v2h2c0-1.1-.9-2-2-2zm-8 20h2V1h-2v22zm8-6h2v-2h-2v2zM15 5h2V3h-2v2zm4 8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2z"/></svg>
@@ -639,8 +742,7 @@ function scrollToCurrentWord() {
       const matrix = new DOMMatrix(currentTransform);
       currentY = matrix.m42;
     }
-    // Quando è flipped, scaleX(-1) è già applicato, translateY funziona uguale
-    content.style.transform = `translateY(${currentY - diff}px)${isFlipped ? ' scaleX(-1)' : ''}`;
+    content.style.transform = `translateY(${currentY - diff}px)`;
   }
 }
 
@@ -982,7 +1084,7 @@ function resetPosition() {
   lastMatchTime = Date.now();
 
   const content = document.getElementById('textContent');
-  content.style.transform = isFlipped ? 'scaleX(-1)' : '';
+  content.style.transform = '';
 
   updateDisplay();
   updateProgress();
@@ -996,12 +1098,15 @@ function resetPosition() {
 // ============================================================
 function toggleFlip() {
   isFlipped = !isFlipped;
-  const content = document.getElementById('textContent');
+  const container = document.getElementById('textContainer');
   const btn = document.getElementById('flipBtn');
 
   if (isFlipped) {
+    // Specchia orizzontalmente tutto il contenitore (per specchio teleprompter)
+    container.style.transform = 'scaleX(-1)';
     btn.classList.add('active');
   } else {
+    container.style.transform = '';
     btn.classList.remove('active');
   }
 
@@ -1031,6 +1136,44 @@ function changeFontSize(delta) {
 function applyFontSize() {
   document.getElementById('textContent').style.fontSize = fontSize + 'px';
   // Riscrollare dopo cambio dimensione
+  setTimeout(scrollToCurrentWord, 100);
+}
+
+// ============================================================
+// MARGINI LATERALI E ALLINEAMENTO
+// ============================================================
+let currentMargin = 0;
+let currentAlign = 'left';
+
+function toggleSettings() {
+  const panel = document.getElementById('settingsPanel');
+  const btn = document.getElementById('settingsBtn');
+  if (panel.style.display === 'flex') {
+    panel.style.display = 'none';
+    btn.classList.remove('active');
+  } else {
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
+    btn.classList.add('active');
+  }
+}
+
+function updateMargins(val) {
+  currentMargin = parseInt(val);
+  document.getElementById('marginValue').textContent = val + '%';
+  const container = document.getElementById('textContainer');
+  container.style.paddingLeft = (40 + (window.innerWidth * currentMargin / 100)) + 'px';
+  container.style.paddingRight = (40 + (window.innerWidth * currentMargin / 100)) + 'px';
+  setTimeout(scrollToCurrentWord, 100);
+}
+
+function setAlign(align) {
+  currentAlign = align;
+  document.getElementById('textContent').style.textAlign = align;
+
+  document.getElementById('alignLeftBtn').classList.toggle('active', align === 'left');
+  document.getElementById('alignCenterBtn').classList.toggle('active', align === 'center');
+
   setTimeout(scrollToCurrentWord, 100);
 }
 
