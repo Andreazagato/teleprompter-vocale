@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Teleprompter Vocale</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #111;
+    color: #fff;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* === SCHERMATA INIZIALE (inserimento testo) === */
+  #setupScreen {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 20px;
+  }
+
+  #setupScreen h1 {
+    text-align: center;
+    font-size: 1.6em;
+    margin-bottom: 15px;
+    color: #e0e0e0;
+  }
+
+  #scriptInput {
+    flex: 1;
+    background: #1a1a1a;
+    color: #fff;
+    border: 2px solid #333;
+    border-radius: 12px;
+    padding: 20px;
+    font-size: 18px;
+    line-height: 1.6;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+  }
+
+  #scriptInput:focus {
+    border-color: #e91e63;
+  }
+
+  #scriptInput::placeholder {
+    color: #666;
+  }
+
+  .setup-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+  }
+
+  .setup-btn {
+    padding: 14px 40px;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .setup-btn.primary {
+    background: #e91e63;
+    color: #fff;
+  }
+  .setup-btn.primary:hover { background: #c2185b; }
+
+  .setup-btn.secondary {
+    background: #333;
+    color: #fff;
+  }
+  .setup-btn.secondary:hover { background: #444; }
+
+  /* === SCHERMATA TELEPROMPTER === */
+  #prompterScreen {
+    display: none;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* Barra progresso in alto */
+  #progressBarContainer {
+    height: 6px;
+    background: #333;
+    width: 100%;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  #progressBar {
+    height: 100%;
+    background: #e91e63;
+    width: 0%;
+    transition: width 0.3s ease;
+    position: relative;
+  }
+
+  #progressMarkerStart, #progressMarkerEnd {
+    position: absolute;
+    top: -4px;
+    width: 4px;
+    height: 14px;
+    background: #e91e63;
+    border-radius: 2px;
+  }
+
+  #progressMarkerStart { left: 25%; }
+  #progressMarkerEnd { left: 75%; }
+
+  /* Area testo principale */
+  #textContainer {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    padding: 30px 40px;
+  }
+
+  #textContent {
+    transition: transform 0.4s ease-out;
+    padding-bottom: 60vh;
+  }
+
+  #textContent.flipped {
+    transform: scaleX(-1);
+  }
+
+  .word {
+    display: inline;
+    transition: color 0.2s, opacity 0.2s;
+    cursor: default;
+    line-height: 1.5;
+  }
+
+  .word.spoken {
+    color: #888;
+    opacity: 0.6;
+  }
+
+  .word.current {
+    color: #fff;
+    text-shadow: 0 0 8px rgba(233, 30, 99, 0.5);
+    position: relative;
+  }
+
+  .word.upcoming {
+    color: #fff;
+  }
+
+  .word.heard {
+    color: #e91e63;
+    font-weight: bold;
+  }
+
+  /* Indicatore di ascolto */
+  #listeningIndicator {
+    position: fixed;
+    bottom: 70px;
+    right: 20px;
+    background: #4caf50;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    z-index: 100;
+    animation: pulse 1.5s infinite;
+  }
+
+  #listeningIndicator.paused {
+    background: #ff9800;
+    animation: none;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  #listeningIndicator .dot {
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border-radius: 50%;
+  }
+
+  /* Icona microfono a destra */
+  #micIcon {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.4;
+    z-index: 50;
+  }
+
+  #micIcon svg {
+    width: 24px;
+    height: 24px;
+    fill: #fff;
+  }
+
+  /* Barra di controllo in basso */
+  #controlBar {
+    height: 60px;
+    background: #1a1a1a;
+    border-top: 2px solid #e91e63;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px;
+    flex-shrink: 0;
+    z-index: 200;
+  }
+
+  .controls-left, .controls-center, .controls-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .controls-left { flex: 1; }
+  .controls-center { flex: 1; justify-content: center; }
+  .controls-right { flex: 1; justify-content: flex-end; }
+
+  /* Pulsante Start/Stop */
+  #startStopBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #fff;
+  }
+
+  #startStopBtn.start {
+    background: #e91e63;
+  }
+  #startStopBtn.start:hover { background: #c2185b; }
+
+  #startStopBtn.stop {
+    background: #555;
+  }
+  #startStopBtn.stop:hover { background: #666; }
+
+  #startStopBtn .icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  #startStopBtn .icon.play {
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 7px 0 7px 14px;
+    border-color: transparent transparent transparent #fff;
+  }
+
+  #startStopBtn .icon.square {
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 2px;
+  }
+
+  /* Timer */
+  #timer {
+    font-size: 14px;
+    color: #aaa;
+    font-variant-numeric: tabular-nums;
+    min-width: 45px;
+  }
+
+  /* Reset button */
+  .ctrl-btn {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 13px;
+  }
+
+  .ctrl-btn:hover { color: #fff; background: #333; }
+  .ctrl-btn.active { color: #e91e63; }
+
+  .ctrl-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+
+  /* Font size control */
+  .font-size-control {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .font-size-control .size-btn {
+    background: #333;
+    border: none;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .font-size-control .size-btn:hover { background: #444; }
+
+  #fontSizeDisplay {
+    color: #aaa;
+    font-size: 14px;
+    min-width: 25px;
+    text-align: center;
+  }
+
+  /* Label sotto i pulsanti */
+  .ctrl-with-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .ctrl-label {
+    font-size: 10px;
+    color: #666;
+  }
+
+  /* Debug / parola sentita */
+  #heardWord {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.7);
+    color: #e91e63;
+    padding: 5px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    display: none;
+    z-index: 100;
+  }
+
+  /* Fullscreen */
+  body.fullscreen #controlBar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+
+  /* Responsive per tablet */
+  @media (max-width: 768px) {
+    #textContainer {
+      padding: 20px 25px;
+    }
+    #controlBar {
+      height: 55px;
+      padding: 0 10px;
+    }
+    .ctrl-label { display: none; }
+  }
+
+  /* Schermata back-to-edit */
+  #backBtn {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+  #backBtn:hover { opacity: 1; background: rgba(255,255,255,0.2); }
+</style>
+</head>
+<body>
+
+<!-- ====== SCHERMATA 1: INSERIMENTO COPIONE ====== -->
+<div id="setupScreen">
+  <h1>Teleprompter Vocale</h1>
+  <textarea id="scriptInput" placeholder="Incolla qui il tuo copione...&#10;&#10;Il teleprompter seguirà la tua voce mentre parli. Se ti fermi o vai fuori copione, si mette in pausa automaticamente. Quando riprendi il discorso dal copione, riparte da solo."></textarea>
+  <div class="setup-buttons">
+    <button class="setup-btn primary" onclick="startPrompter()">&#9654; Avvia Teleprompter</button>
+  </div>
+</div>
+
+<!-- ====== SCHERMATA 2: TELEPROMPTER ====== -->
+<div id="prompterScreen">
+
+  <button id="backBtn" onclick="goBack()">&#8592; Copione</button>
+
+  <!-- Barra progresso -->
+  <div id="progressBarContainer">
+    <div id="progressBar"></div>
+    <div id="progressMarkerStart"></div>
+    <div id="progressMarkerEnd"></div>
+  </div>
+
+  <!-- Area testo -->
+  <div id="textContainer">
+    <div id="textContent"></div>
+  </div>
+
+  <!-- Icona microfono -->
+  <div id="micIcon">
+    <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
+  </div>
+
+  <!-- Indicatore ascolto -->
+  <div id="listeningIndicator">
+    <span class="dot"></span>
+    <span id="listeningText">In ascolto...</span>
+  </div>
+
+  <!-- Parola sentita (debug piccolo) -->
+  <div id="heardWord"></div>
+
+  <!-- Barra controlli -->
+  <div id="controlBar">
+    <div class="controls-left">
+      <button id="startStopBtn" class="start" onclick="toggleListening()">
+        <span class="icon play"></span>
+        <span id="startStopLabel">Start</span>
+      </button>
+
+      <button class="ctrl-btn" onclick="resetPosition()" title="Ricomincia">
+        <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+      </button>
+
+      <span id="timer">0:00</span>
+    </div>
+
+    <div class="controls-center">
+      <div class="font-size-control">
+        <button class="size-btn" onclick="changeFontSize(-4)">A</button>
+        <span id="fontSizeDisplay">50</span>
+        <button class="size-btn" style="font-size:20px" onclick="changeFontSize(4)">A</button>
+      </div>
+    </div>
+
+    <div class="controls-right">
+      <div class="ctrl-with-label">
+        <button class="ctrl-btn" id="flipBtn" onclick="toggleFlip()" title="Flip">
+          <svg viewBox="0 0 24 24"><path d="M15 21h2v-2h-2v2zm4-12h2V7h-2v2zM3 5v14c0 1.1.9 2 2 2h4v-2H5V5h4V3H5c-1.1 0-2 .9-2 2zm16-2v2h2c0-1.1-.9-2-2-2zm-8 20h2V1h-2v22zm8-6h2v-2h-2v2zM15 5h2V3h-2v2zm4 8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2z"/></svg>
+        </button>
+        <span class="ctrl-label">Flip</span>
+      </div>
+
+      <div class="ctrl-with-label">
+        <button class="ctrl-btn" id="fullscreenBtn" onclick="toggleFullscreen()" title="Fullscreen">
+          <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+        </button>
+        <span class="ctrl-label">Fullscreen</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATO GLOBALE
+// ============================================================
+let words = [];             // array di parole del copione
+let wordElements = [];      // riferimenti DOM
+let currentIndex = 0;       // posizione corrente nel copione
+let isListening = false;
+let isFlipped = false;
+let fontSize = 50;
+let timerInterval = null;
+let timerSeconds = 0;
+let recognition = null;
+let isPaused = false;       // fuori copione, in attesa di rientro
+let lastMatchTime = 0;
+
+// Parametri di matching
+const MATCH_WINDOW = 10;       // quante parole in avanti cercare (max 10)
+const RESUME_WINDOW = 30;      // finestra per rientro dopo pausa
+const PAUSE_TIMEOUT = 4000;    // ms senza match prima di "pausa"
+const MIN_WORD_LEN = 3;        // lunghezza minima parola per matching singolo
+
+// Parole troppo comuni da ignorare nel matching singolo (stop words italiane)
+const STOP_WORDS = new Set([
+  'il','lo','la','i','gli','le','un','uno','una',
+  'di','del','dello','della','dei','degli','delle',
+  'a','al','allo','alla','ai','agli','alle',
+  'da','dal','dallo','dalla','dai','dagli','dalle',
+  'in','nel','nello','nella','nei','negli','nelle',
+  'su','sul','sullo','sulla','sui','sugli','sulle',
+  'con','per','tra','fra',
+  'e','o','ma','che','se','non','ci','si','ne',
+  'come','dove','quando','quanto','chi',
+  'questo','quello','suo','mio','tuo',
+  'sono','ha','ho','è'
+]);
+
+// ============================================================
+// NORMALIZZAZIONE TESTO
+// ============================================================
+function normalize(text) {
+  return text
+    .toLowerCase()
+    .replace(/[''`]/g, "'")
+    .replace(/[^\w\sàèìòùáéíóúâêîôûäëïöü']/g, '')
+    .trim();
+}
+
+// ============================================================
+// AVVIO TELEPROMPTER
+// ============================================================
+function startPrompter() {
+  const script = document.getElementById('scriptInput').value.trim();
+  if (!script) {
+    alert('Inserisci un copione prima di avviare.');
+    return;
+  }
+
+  // Parsing parole
+  const rawWords = script.split(/\s+/);
+  words = rawWords.map(w => ({
+    original: w,
+    normalized: normalize(w)
+  }));
+
+  // Genera HTML
+  const container = document.getElementById('textContent');
+  container.innerHTML = '';
+  wordElements = [];
+
+  words.forEach((w, i) => {
+    const span = document.createElement('span');
+    span.className = 'word upcoming';
+    span.textContent = w.original + ' ';
+    span.dataset.index = i;
+    container.appendChild(span);
+    wordElements.push(span);
+  });
+
+  // Mostra schermata prompter
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('prompterScreen').style.display = 'flex';
+
+  currentIndex = 0;
+  updateDisplay();
+  updateProgress();
+  applyFontSize();
+}
+
+// ============================================================
+// TORNARE ALLA MODIFICA
+// ============================================================
+function goBack() {
+  stopListening();
+  document.getElementById('prompterScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'flex';
+}
+
+// ============================================================
+// DISPLAY E SCROLLING
+// ============================================================
+function updateDisplay() {
+  wordElements.forEach((el, i) => {
+    if (i < currentIndex) {
+      el.className = 'word spoken';
+    } else if (i === currentIndex) {
+      el.className = 'word current';
+    } else {
+      el.className = 'word upcoming';
+    }
+  });
+
+  scrollToCurrentWord();
+}
+
+function scrollToCurrentWord() {
+  if (currentIndex >= wordElements.length) return;
+
+  const container = document.getElementById('textContainer');
+  const currentEl = wordElements[currentIndex];
+
+  if (!currentEl) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const wordRect = currentEl.getBoundingClientRect();
+
+  // Mantieni la parola corrente nel terzo superiore dello schermo
+  const targetY = containerRect.top + containerRect.height * 0.3;
+  const diff = wordRect.top - targetY;
+
+  if (Math.abs(diff) > 10) {
+    const content = document.getElementById('textContent');
+    const currentTransform = getComputedStyle(content).transform;
+    let currentY = 0;
+    if (currentTransform !== 'none') {
+      const matrix = new DOMMatrix(currentTransform);
+      currentY = matrix.m42;
+    }
+    // Quando è flipped, scaleX(-1) è già applicato, translateY funziona uguale
+    content.style.transform = `translateY(${currentY - diff}px)${isFlipped ? ' scaleX(-1)' : ''}`;
+  }
+}
+
+function updateProgress() {
+  const pct = words.length > 0 ? (currentIndex / words.length) * 100 : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+// ============================================================
+// RICONOSCIMENTO VOCALE
+// ============================================================
+function initRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Il tuo browser non supporta il riconoscimento vocale. Usa Chrome o Edge.');
+    return null;
+  }
+
+  const rec = new SpeechRecognition();
+  rec.lang = 'it-IT';
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 3;
+
+  rec.onresult = handleSpeechResult;
+
+  rec.onerror = (e) => {
+    console.log('Speech error:', e.error);
+    if (e.error === 'no-speech' || e.error === 'audio-capture') {
+      // Riprova
+      if (isListening) {
+        try { rec.stop(); } catch(ex) {}
+        setTimeout(() => {
+          if (isListening) {
+            try { rec.start(); } catch(ex) {}
+          }
+        }, 300);
+      }
+    }
+  };
+
+  rec.onend = () => {
+    // Riavvia automaticamente se ancora in ascolto
+    if (isListening) {
+      setTimeout(() => {
+        if (isListening) {
+          try { rec.start(); } catch(ex) {}
+        }
+      }, 200);
+    }
+  };
+
+  return rec;
+}
+
+function handleSpeechResult(event) {
+  if (!isListening) return;
+
+  for (let i = event.resultIndex; i < event.results.length; i++) {
+    const result = event.results[i];
+
+    // Prendi tutte le alternative
+    for (let alt = 0; alt < result.length; alt++) {
+      const transcript = result[alt].transcript;
+      const spokenWords = transcript.trim().split(/\s+/).map(normalize).filter(w => w.length > 0);
+
+      if (spokenWords.length === 0) continue;
+
+      // Mostra l'ultima parola sentita
+      showHeardWord(spokenWords[spokenWords.length - 1]);
+
+      if (isPaused) {
+        // MODALITÀ PAUSA: cerca coppia di parole consecutive per rientrare
+        tryResume(spokenWords);
+      } else {
+        // MODALITÀ ATTIVA: avanza nel copione
+        tryAdvance(spokenWords);
+      }
+    }
+  }
+}
+
+// ============================================================
+// LOGICA DI AVANZAMENTO
+// ============================================================
+function tryAdvance(spokenWords) {
+  let matched = false;
+  const searchEnd = Math.min(currentIndex + MATCH_WINDOW, words.length);
+
+  // STRATEGIA 1: cerca coppie di parole consecutive (bigram) nelle parole sentite
+  // Questo è il modo più affidabile: se sento 2 parole di fila che corrispondono
+  // al copione, sicuramente sto seguendo il testo
+  for (let si = 0; si < spokenWords.length - 1; si++) {
+    const w1 = spokenWords[si];
+    const w2 = spokenWords[si + 1];
+    if (w1.length < 2 || w2.length < 2) continue;
+
+    for (let j = currentIndex; j < searchEnd - 1; j++) {
+      if (wordsMatch(w1, words[j].normalized) && wordsMatch(w2, words[j + 1].normalized)) {
+        currentIndex = j + 2;
+        matched = true;
+        lastMatchTime = Date.now();
+        updateDisplay();
+        updateProgress();
+        break;
+      }
+    }
+    if (matched) break;
+  }
+
+  // STRATEGIA 2: se non ho trovato bigram, accetta singola parola
+  // MA solo se è la prossima parola (posizione +0 o +1) e non è una stop word
+  if (!matched) {
+    for (const spoken of spokenWords) {
+      if (spoken.length < 2) continue;
+
+      // Per singola parola: controlla solo le prime 2 posizioni (la corrente e la prossima)
+      const singleEnd = Math.min(currentIndex + 2, words.length);
+
+      for (let j = currentIndex; j < singleEnd; j++) {
+        const scriptWord = words[j].normalized;
+
+        // Ignora stop words per match singolo (troppe false positive)
+        if (STOP_WORDS.has(scriptWord) || STOP_WORDS.has(spoken)) continue;
+
+        if (wordsMatch(spoken, scriptWord)) {
+          currentIndex = j + 1;
+          matched = true;
+          lastMatchTime = Date.now();
+          updateDisplay();
+          updateProgress();
+          break;
+        }
+      }
+      if (matched) break;
+    }
+  }
+
+  // Se non c'è match da un po', entra in pausa
+  if (!matched && lastMatchTime > 0 && (Date.now() - lastMatchTime) > PAUSE_TIMEOUT) {
+    enterPause();
+  }
+}
+
+function tryResume(spokenWords) {
+  // Cerca una coppia di parole consecutive nel copione
+  // per confermare che l'utente sta riprendendo il copione
+
+  const searchStart = Math.max(0, currentIndex - 3);
+  const searchEnd = Math.min(currentIndex + RESUME_WINDOW, words.length - 1);
+
+  // Costruisci una stringa dalle parole sentite per cercare bigrammi
+  for (let si = 0; si < spokenWords.length - 1; si++) {
+    const w1 = spokenWords[si];
+    const w2 = spokenWords[si + 1];
+
+    if (w1.length < 2 || w2.length < 2) continue;
+
+    for (let j = searchStart; j < searchEnd; j++) {
+      const sw1 = words[j].normalized;
+      const sw2 = words[j + 1].normalized;
+
+      if (wordsMatch(w1, sw1) && wordsMatch(w2, sw2)) {
+        // Coppia trovata! Riprendi da qui
+        currentIndex = j + 2;
+        exitPause();
+        updateDisplay();
+        updateProgress();
+        return;
+      }
+    }
+  }
+
+  // Prova anche con singola parola lunga (>= 6 caratteri) se unica nel contesto
+  for (const spoken of spokenWords) {
+    if (spoken.length < 6) continue;
+
+    let matchCount = 0;
+    let matchIdx = -1;
+
+    for (let j = searchStart; j < searchEnd + 1; j++) {
+      if (wordsMatch(spoken, words[j].normalized)) {
+        matchCount++;
+        matchIdx = j;
+      }
+    }
+
+    // Solo se è una parola unica nella finestra
+    if (matchCount === 1 && matchIdx >= currentIndex - 3) {
+      currentIndex = matchIdx + 1;
+      exitPause();
+      updateDisplay();
+      updateProgress();
+      return;
+    }
+  }
+}
+
+function wordsMatch(spoken, script) {
+  if (!spoken || !script) return false;
+
+  // Match esatto
+  if (spoken === script) return true;
+
+  // Parole molto corte (<=2 caratteri): solo match esatto (già gestito sopra)
+  if (script.length <= 2 || spoken.length <= 2) return false;
+
+  // Parole corte (3 caratteri): tolleranza 1 solo carattere
+  if (script.length <= 3 || spoken.length <= 3) {
+    return levenshtein(spoken, script) <= 1;
+  }
+
+  // Parole medie/lunghe (>=4 caratteri): Levenshtein con tolleranza 20%
+  const maxDist = Math.max(1, Math.floor(Math.min(spoken.length, script.length) * 0.2));
+  if (levenshtein(spoken, script) <= maxDist) return true;
+
+  // Match per inizio parola (prefisso comune di almeno 5 caratteri)
+  // Utile quando il riconoscimento tronca una parola lunga
+  if (spoken.length >= 5 && script.length >= 5) {
+    const prefixLen = Math.min(5, Math.min(spoken.length, script.length));
+    if (spoken.substring(0, prefixLen) === script.substring(0, prefixLen)) return true;
+  }
+
+  return false;
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// ============================================================
+// GESTIONE PAUSA / RIPRESA
+// ============================================================
+function enterPause() {
+  if (isPaused) return;
+  isPaused = true;
+  const ind = document.getElementById('listeningIndicator');
+  ind.classList.add('paused');
+  document.getElementById('listeningText').textContent = 'In pausa...';
+}
+
+function exitPause() {
+  isPaused = false;
+  lastMatchTime = Date.now();
+  const ind = document.getElementById('listeningIndicator');
+  ind.classList.remove('paused');
+  document.getElementById('listeningText').textContent = 'In ascolto...';
+}
+
+// ============================================================
+// CONTROLLI UI
+// ============================================================
+function toggleListening() {
+  if (isListening) {
+    stopListening();
+  } else {
+    startListening();
+  }
+}
+
+function startListening() {
+  if (!recognition) {
+    recognition = initRecognition();
+    if (!recognition) return;
+  }
+
+  try {
+    recognition.start();
+  } catch(e) {
+    // Potrebbe essere già attivo
+    recognition.stop();
+    setTimeout(() => { try { recognition.start(); } catch(ex) {} }, 300);
+  }
+
+  isListening = true;
+  isPaused = false;
+  lastMatchTime = Date.now();
+
+  // UI
+  const btn = document.getElementById('startStopBtn');
+  btn.className = 'stop';
+  btn.querySelector('.icon').className = 'icon square';
+  document.getElementById('startStopLabel').textContent = 'Stop';
+
+  document.getElementById('listeningIndicator').style.display = 'flex';
+  document.getElementById('listeningText').textContent = 'In ascolto...';
+
+  // Timer
+  timerSeconds = 0;
+  updateTimer();
+  timerInterval = setInterval(() => {
+    timerSeconds++;
+    updateTimer();
+  }, 1000);
+}
+
+function stopListening() {
+  isListening = false;
+  isPaused = false;
+
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+  }
+
+  // UI
+  const btn = document.getElementById('startStopBtn');
+  btn.className = 'start';
+  btn.querySelector('.icon').className = 'icon play';
+  document.getElementById('startStopLabel').textContent = 'Start';
+
+  document.getElementById('listeningIndicator').style.display = 'none';
+
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function updateTimer() {
+  const m = Math.floor(timerSeconds / 60);
+  const s = timerSeconds % 60;
+  document.getElementById('timer').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function resetPosition() {
+  currentIndex = 0;
+  isPaused = false;
+  lastMatchTime = Date.now();
+
+  const content = document.getElementById('textContent');
+  content.style.transform = isFlipped ? 'scaleX(-1)' : '';
+
+  updateDisplay();
+  updateProgress();
+
+  timerSeconds = 0;
+  updateTimer();
+}
+
+// ============================================================
+// FLIP / FULLSCREEN / FONT
+// ============================================================
+function toggleFlip() {
+  isFlipped = !isFlipped;
+  const content = document.getElementById('textContent');
+  const btn = document.getElementById('flipBtn');
+
+  if (isFlipped) {
+    btn.classList.add('active');
+  } else {
+    btn.classList.remove('active');
+  }
+
+  // Ricalcola posizione
+  scrollToCurrentWord();
+}
+
+function toggleFullscreen() {
+  const btn = document.getElementById('fullscreenBtn');
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().then(() => {
+      btn.classList.add('active');
+    }).catch(() => {});
+  } else {
+    document.exitFullscreen().then(() => {
+      btn.classList.remove('active');
+    }).catch(() => {});
+  }
+}
+
+function changeFontSize(delta) {
+  fontSize = Math.max(20, Math.min(100, fontSize + delta));
+  document.getElementById('fontSizeDisplay').textContent = fontSize;
+  applyFontSize();
+}
+
+function applyFontSize() {
+  document.getElementById('textContent').style.fontSize = fontSize + 'px';
+  // Riscrollare dopo cambio dimensione
+  setTimeout(scrollToCurrentWord, 100);
+}
+
+// ============================================================
+// FEEDBACK VISIVO
+// ============================================================
+function showHeardWord(word) {
+  const el = document.getElementById('heardWord');
+  el.textContent = word;
+  el.style.display = 'block';
+  clearTimeout(el._timeout);
+  el._timeout = setTimeout(() => { el.style.display = 'none'; }, 1500);
+}
+
+// ============================================================
+// KEYBOARD SHORTCUTS
+// ============================================================
+document.addEventListener('keydown', (e) => {
+  // Solo nella schermata prompter
+  if (document.getElementById('prompterScreen').style.display === 'none') return;
+
+  if (e.code === 'Space' && e.target.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    toggleListening();
+  } else if (e.code === 'KeyF') {
+    toggleFlip();
+  } else if (e.code === 'KeyR') {
+    resetPosition();
+  } else if (e.code === 'Escape') {
+    goBack();
+  } else if (e.code === 'ArrowUp') {
+    e.preventDefault();
+    changeFontSize(4);
+  } else if (e.code === 'ArrowDown') {
+    e.preventDefault();
+    changeFontSize(-4);
+  }
+});
+
+// Impedisci il doppio tap zoom su mobile
+document.addEventListener('touchstart', (e) => {
+  if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+
+// ============================================================
+// INIT
+// ============================================================
+applyFontSize();
+</script>
+</body>
+</html>
